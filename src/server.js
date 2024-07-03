@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3211;
 const ejs = require("ejs");
 
 app.engine("ejs", ejs.renderFile);
-app.set("views", path.join(__dirname, "views")); 
+app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -46,9 +46,11 @@ io.on("connection", (socket) => {
     fs.writeFile(audioFilePath, audioBuffer, (err) => {
       if (err) {
         console.error("Error saving audio:", err);
+        socket.emit("message", "Failed to save audio note.");
         return;
       }
-      io.emit("audioMessage", `/${audioFileName}`);
+      // Mengirim pesan hanya ke client yang mengirimkan voice note
+      socket.emit("audioMessage", `/${audioFileName}`);
     });
   });
 
@@ -61,9 +63,11 @@ io.on("connection", (socket) => {
     fs.writeFile(videoFilePath, videoBuffer, (err) => {
       if (err) {
         console.error("Error saving video:", err);
+        socket.emit("message", "Failed to save video note.");
         return;
       }
-      io.emit("videoMessage", `/${videoFileName}`);
+      // Mengirim pesan hanya ke client yang mengirimkan video note
+      socket.emit("videoMessage", `/${videoFileName}`);
     });
   });
 });
