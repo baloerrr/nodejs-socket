@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat App</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="flex justify-center items-center h-screen bg-gray-100">
+  <div class="flex space-x-4">
+    <div class="w-1/2 bg-white p-4 rounded-lg shadow-lg">
+      <h2 class="text-xl font-bold mb-4">Server</h2>
+      <div id="serverMessages" class="space-y-2"></div>
+    </div>
+    <div class="w-1/2 bg-white p-4 rounded-lg shadow-lg">
+      <h2 class="text-xl font-bold mb-4">Client</h2>
+      <div id="clientMessages" class="space-y-2"></div>
+      
+      <form id="chatForm" class="mt-4 flex">
+        <input type="text" id="messageInput" placeholder="Type your message..." class="flex-grow p-2 border border-gray-300 rounded-l-lg focus:outline-none">
+        <button type="submit" class="p-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600">Send</button>
+      </form>
+
+      <button id="recordButton" class="mt-4 p-2 bg-green-500 text-white rounded-lg hover:bg-green-600">Record Voice Note</button>
+      <button id="recordVideoButton" class="mt-4 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Record Video Note</button>
+
+      <!-- Pratinjau Webcam -->
+      <video id="videoPreview" class="mt-4 w-full hidden" autoplay muted></video>
+      <button id="sendVideoButton" class="mt-4 p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 hidden">Send Video</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    let audioRecorder;
+    let videoRecorder;
+    let audioStream;
+    let videoStream;
+    let videoChunks = [];
+
+    socket.on('message', (message) => {
+      const serverMessagesDiv = document.getElementById('serverMessages');
+      serverMessagesDiv.innerHTML += `<p class="p-2 bg-gray-200 rounded-lg">${message}</p>`;
+    });
+
+    socket.on('audioMessage', (audioUrl) => {
+      const clientMessagesDiv = document.getElementById('clientMessages');
+      const serverMessagesDiv = document.getElementById('serverMessages');
+      const audioElement = document.createElement('audio');
+      audioElement.controls = true;
+      audioElement.src = audioUrl;
+      
+      // Append audio to both client and server messages
+      clientMessagesDiv.appendChild(audioElement.cloneNode(true));
+      serverMessagesDiv.appendChild(audioElement);
+    });
+
+    socket.on('videoMessage', (videoUrl) => {
+      const clientMessagesDiv = document.getElementById('clientMessages');
+      const serverMessagesDiv = document.getElementById('serverMessages');
+      const videoElement = document.createElement('video');
+      videoElement.controls = true;
+      videoElement.src = videoUrl;
+      videoElement.className = "w-full";
+      
+      // Append video to both client and server messages
+      clientMessagesDiv.appendChild(videoElement.cloneNode(true));
+      serverMessagesDiv.appendChild(videoElement);
+    });
+
+    document.getElementById('chatForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const messageInput = document.getElementById('messageInput');
+      const message = messageInput.value.trim();
+      if (message !== '') {
+        socket.emit('chatMessage', message);
+        const clientMessagesDiv = document.getElementById('clientMessages');
+        clientMessagesDiv.innerHTML += `<p class="p-2 bg-blue-100 rounded-lg">${message}</p>`;
+        messageInput.value = '';
+      }
+    });
+
+    document.getElementById('recordButton').addEventListener('click', async () => {
+      if (audioRecorder && audioRecorder.state === 'recording') {
+        audioRecorder.stop();
+        audioStream.getTracks().forEach(track => track.stop());
+        audioRecorder = null;
+        audioStream = null;
+        document.getElementById('recordButton').textContent = 'Record Voice Note';
+      } else {
+        try {
+          audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioRecorder = new MediaRecorder(audioStream);
+          let audioChunks = [];
+
+          audioRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+          };
+
+          audioRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const reader = new FileReader();
+
+            reader.onloadend = () => {
+              const base64String = reader.result.replace('data:', '').replace(/^.+,/, '');
+              console.log("Sending voice note:", base64String);
+              socket.emit('voiceNote', base64String);
+            };
+
+            reader.readAsDataURL(audioBlob);
+          };
+
+          audioRecorder.start();
+          document.getElementById('recordButton').textContent = 'Stop Recording';
+        } catch (err) {
+          console.error('Error accessing microphone: ' + err);
+        }
+      }
+    });
+
+    document.getElementById('recordVideoButton').addEventListener('click', async () => {
+      if (videoRecorder && videoRecorder.state === 'recording') {
+        videoRecorder.stop();
+        videoStream.getTracks().forEach(track => track.stop());
+        videoRecorder = null;
+        videoStream = null;
+        document.getElementById('recordVideoButton').textContent = 'Record Video Note';
+        document.getElementById('sendVideoButton').classList.remove('hidden');
+      } else {
+        try {
+          videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const videoPreview = document.getElementById('videoPreview');
+          videoPreview.srcObject = videoStream;
+          videoPreview.classList.remove('hidden');
+
+          videoRecorder = new MediaRecorder(videoStream);
+          videoChunks = [];
+
+          videoRecorder.ondataavailable = (event) => {
+            videoChunks.push(event.data);
+          };
+
+          videoRecorder.onstop = () => {
+            console.log("Video recording stopped, ready to send.");
+          };
+
+          videoRecorder.start();
+          document.getElementById('recordVideoButton').textContent = 'Stop Recording';
+        } catch (err) {
+          console.error('Error accessing webcam: ' + err);
+        }
+      }
+    });
+
+    document.getElementById('sendVideoButton').addEventListener('click', () => {
+      if (videoChunks.length > 0) {
+        const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
+        const reader = new FileReader();
+
+        reader.onloadend = () => {
+          const base64String = reader.result.replace('data:', '').replace(/^.+,/, '');
+          console.log("Sending video note:", base64String);
+          socket.emit('videoNote', base64String);
+          document.getElementById('videoPreview').classList.add('hidden');
+          document.getElementById('sendVideoButton').classList.add('hidden');
+          videoChunks = [];
+        };
+
+        reader.readAsDataURL(videoBlob);
+      }
+    });
+  </script>
+</body>
+</html>
