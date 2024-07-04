@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3211;
 const ejs = require("ejs");
 
 app.engine("ejs", ejs.renderFile);
-app.set("views", path.join(__dirname, "views"));
+app.set("views", path.join(__dirname, "views")); 
 app.set("view engine", "ejs");
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -24,8 +24,8 @@ app.get("/", (req, res) => {
   res.render("index");
 });
 
-io.on("connection", (socket) => {
-  console.log("A user connected");
+io.on('connection', (socket) => {
+  console.log('New client connected');
 
   socket.emit("message", "Welcome to the chat!");
 
@@ -46,11 +46,9 @@ io.on("connection", (socket) => {
     fs.writeFile(audioFilePath, audioBuffer, (err) => {
       if (err) {
         console.error("Error saving audio:", err);
-        socket.emit("message", "Failed to save audio note.");
         return;
       }
-      // Mengirim pesan hanya ke client yang mengirimkan voice note
-      socket.emit("audioMessage", `/${audioFileName}`);
+      io.emit("audioMessage", `/${audioFileName}`);
     });
   });
 
@@ -63,14 +61,32 @@ io.on("connection", (socket) => {
     fs.writeFile(videoFilePath, videoBuffer, (err) => {
       if (err) {
         console.error("Error saving video:", err);
-        socket.emit("message", "Failed to save video note.");
         return;
       }
-      // Mengirim pesan hanya ke client yang mengirimkan video note
-      socket.emit("videoMessage", `/${videoFileName}`);
+      io.emit("videoMessage", `/${videoFileName}`);
     });
   });
+
+  socket.on('fileNote', (fileData) => {
+    console.log("Received file note");
+    const fileBuffer = Buffer.from(fileData.data, "base64");
+    const fileName = `file-${Date.now()}-${fileData.name}`;
+    const filePath = path.join(__dirname, "public", fileName);
+
+    fs.writeFile(filePath, fileBuffer, (err) => {
+      if (err) {
+        console.error("Error saving file:", err);
+        return;
+      }
+      io.emit("fileMessage", { name: fileData.name, url: `/${fileName}` });
+    });
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
 });
+
 
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
