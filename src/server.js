@@ -11,7 +11,7 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  maxHttpBufferSize: 1e7
+  maxHttpBufferSize: 1e7,
 });
 const PORT = process.env.PORT || 3211;
 
@@ -20,25 +20,34 @@ app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
 app.use(express.static(path.join(__dirname, "public")));
-app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.json({ limit: "50mb" }));
 
 app.get("/", (req, res) => {
-  res.render("index");
+  res.redirect("/server");
 });
 
-io.on('connection', (socket) => {
-  console.log('New client connected');
+app.get("/server", (req, res) => {
+  res.render("index", { userType: "server" });
+});
+
+app.get("/client/:id", (req, res) => {
+  const clientId = req.params.id;
+  res.render("index", { userType: "client", clientId });
+});
+
+io.on("connection", (socket) => {
+  console.log("New client connected");
 
   socket.emit("message", "Welcome to the chat!");
 
-  socket.on("chatMessage", async (content) => {
-    try {
-      io.emit("message", content);
-    } catch (error) {
-      console.error("Error saving message:", error.message);
-    }
+  // Handle text messages
+  socket.on("chatMessage", (content) => {
+    console.log("Received chat message:", content);
+    // Emit the message to all clients including the server
+    io.emit("message", content);
   });
 
+  // Handle voice notes
   socket.on("voiceNote", (base64String) => {
     console.log("Received voice note");
     const audioBuffer = Buffer.from(base64String, "base64");
@@ -54,6 +63,7 @@ io.on('connection', (socket) => {
     });
   });
 
+  // Handle video notes
   socket.on("videoNote", (base64String) => {
     console.log("Received video note");
     const videoBuffer = Buffer.from(base64String, "base64");
@@ -69,7 +79,8 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('fileNote', (fileData) => {
+  // Handle file notes
+  socket.on("fileNote", (fileData) => {
     console.log("Received file note");
     const fileBuffer = Buffer.from(fileData.data, "base64");
     const fileName = `file-${Date.now()}-${fileData.name}`;
@@ -84,8 +95,8 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
   });
 });
 
