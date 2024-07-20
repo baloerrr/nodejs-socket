@@ -5,16 +5,18 @@ const { Server } = require("socket.io");
 const path = require("path");
 const fs = require("fs");
 const bodyParser = require("body-parser");
+const ejs = require("ejs");
 
 dotenv.config();
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  maxHttpBufferSize: 1e7
+});
 const PORT = process.env.PORT || 3211;
-const ejs = require("ejs");
 
 app.engine("ejs", ejs.renderFile);
-app.set("views", path.join(__dirname, "views")); 
+app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -86,7 +88,6 @@ io.on('connection', (socket) => {
     console.log('Client disconnected');
   });
 });
-
 
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
