@@ -13,22 +13,24 @@
     <div
       class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 w-full max-w-6xl"
     >
+      <% if (userType === 'server') { %>
       <div
         class="w-full md:w-1/3 h-96 bg-white p-4 rounded-lg shadow-lg overflow-auto"
       >
         <h2 class="text-xl font-bold mb-4">Server</h2>
         <div id="serverMessages" class="space-y-2"></div>
       </div>
+      <% } else { %>
       <div
         class="w-full md:w-1/3 h-96 bg-white p-4 rounded-lg shadow-lg overflow-auto"
       >
-        <h2 class="text-xl font-bold mb-4">Client 1</h2>
-        <div id="client1Messages" class="space-y-2"></div>
+        <h2 class="text-xl font-bold mb-4">Client <%= clientId %></h2>
+        <div id="clientMessages" class="space-y-2"></div>
 
-        <form id="chatForm1" class="mt-4 flex">
+        <form id="chatForm" class="mt-4 flex">
           <input
             type="text"
-            id="messageInput1"
+            id="messageInput"
             placeholder="Type your message..."
             class="flex-grow p-2 border border-gray-300 rounded-l-lg focus:outline-none"
           />
@@ -42,25 +44,25 @@
 
         <input
           type="file"
-          id="fileInput1"
+          id="fileInput"
           class="mt-4 p-2 border border-gray-300 rounded-lg w-full"
         />
         <button
-          id="sendFileButton1"
+          id="sendFileButton"
           class="mt-4 p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 w-full hidden"
         >
           Send File
         </button>
-        <div id="filePreview1" class="mt-4"></div>
+        <div id="filePreview" class="mt-4"></div>
 
         <button
-          id="recordButton1"
+          id="recordButton"
           class="mt-4 p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 w-full"
         >
           Record Voice Note
         </button>
         <button
-          id="recordVideoButton1"
+          id="recordVideoButton"
           class="mt-4 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 w-full"
         >
           Record Video Note
@@ -68,307 +70,168 @@
 
         <!-- Webcam Preview -->
         <video
-          id="videoPreview1"
+          id="videoPreview"
           class="mt-4 w-full hidden"
           autoplay
           muted
         ></video>
         <button
-          id="sendVideoButton1"
+          id="sendVideoButton"
           class="mt-4 p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 hidden w-full"
         >
           Send Video
         </button>
       </div>
-      <div
-        class="w-full md:w-1/3 h-96 bg-white p-4 rounded-lg shadow-lg overflow-auto"
-      >
-        <h2 class="text-xl font-bold mb-4">Client 2</h2>
-        <div id="client2Messages" class="space-y-2"></div>
-
-        <form id="chatForm2" class="mt-4 flex">
-          <input
-            type="text"
-            id="messageInput2"
-            placeholder="Type your message..."
-            class="flex-grow p-2 border border-gray-300 rounded-l-lg focus:outline-none"
-          />
-          <button
-            type="submit"
-            class="p-2 bg-blue-500 text-white rounded-r-lg hover:bg-blue-600"
-          >
-            Send
-          </button>
-        </form>
-
-        <input
-          type="file"
-          id="fileInput2"
-          class="mt-4 p-2 border border-gray-300 rounded-lg w-full"
-        />
-        <button
-          id="sendFileButton2"
-          class="mt-4 p-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 w-full hidden"
-        >
-          Send File
-        </button>
-        <div id="filePreview2" class="mt-4"></div>
-
-        <button
-          id="recordButton2"
-          class="mt-4 p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 w-full"
-        >
-          Record Voice Note
-        </button>
-        <button
-          id="recordVideoButton2"
-          class="mt-4 p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 w-full"
-        >
-          Record Video Note
-        </button>
-
-        <!-- Webcam Preview -->
-        <video
-          id="videoPreview2"
-          class="mt-4 w-full hidden"
-          autoplay
-          muted
-        ></video>
-        <button
-          id="sendVideoButton2"
-          class="mt-4 p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 hidden w-full"
-        >
-          Send Video
-        </button>
-      </div>
+      <% } %>
     </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
       const socket = io();
 
-      const serverMessages = document.getElementById("serverMessages");
-      const client1Messages = document.getElementById("client1Messages");
-      const client2Messages = document.getElementById("client2Messages");
-
-      const appendMessage = (element, message) => {
-        const div = document.createElement("div");
-        div.classList.add("p-2", "bg-gray-200", "rounded-lg");
-        div.textContent = message;
-        element.appendChild(div);
-      };
+      let audioRecorder;
+      let videoRecorder;
+      let audioStream;
+      let videoStream;
+      let videoChunks = [];
 
       socket.on("message", (message) => {
-        appendMessage(serverMessages, message);
-        appendMessage(client1Messages, message);
-        appendMessage(client2Messages, message);
+        const clientMessagesDiv = document.getElementById("clientMessages");
+        const serverMessagesDiv = document.getElementById("serverMessages");
+        const messageElement = document.createElement("p");
+        messageElement.className = "p-2 bg-gray-200 rounded-lg";
+        messageElement.textContent = message;
+
+        if (clientMessagesDiv) {
+          clientMessagesDiv.appendChild(messageElement.cloneNode(true));
+        }
+        if (serverMessagesDiv) {
+          serverMessagesDiv.appendChild(messageElement);
+        }
       });
 
-      socket.on("audioMessage", (url) => {
-        const audio = document.createElement("audio");
-        audio.controls = true;
-        audio.src = url;
-        serverMessages.appendChild(audio);
-        client1Messages.appendChild(audio.cloneNode(true));
-        client2Messages.appendChild(audio.cloneNode(true));
+      socket.on("audioMessage", (audioUrl) => {
+        const clientMessagesDiv = document.getElementById("clientMessages");
+        const serverMessagesDiv = document.getElementById("serverMessages");
+        const audioElement = document.createElement("audio");
+        audioElement.controls = true;
+        audioElement.src = audioUrl;
+
+        if (clientMessagesDiv) {
+          clientMessagesDiv.appendChild(audioElement.cloneNode(true));
+        }
+        if (serverMessagesDiv) {
+          serverMessagesDiv.appendChild(audioElement);
+        }
       });
 
-      socket.on("videoMessage", (url) => {
-        const video = document.createElement("video");
-        video.controls = true;
-        video.src = url;
-        serverMessages.appendChild(video);
-        client1Messages.appendChild(video.cloneNode(true));
-        client2Messages.appendChild(video.cloneNode(true));
+      socket.on("videoMessage", (videoUrl) => {
+        const clientMessagesDiv = document.getElementById("clientMessages");
+        const serverMessagesDiv = document.getElementById("serverMessages");
+        const videoElement = document.createElement("video");
+        videoElement.controls = true;
+        videoElement.src = videoUrl;
+
+        if (clientMessagesDiv) {
+          clientMessagesDiv.appendChild(videoElement.cloneNode(true));
+        }
+        if (serverMessagesDiv) {
+          serverMessagesDiv.appendChild(videoElement);
+        }
       });
 
-      socket.on("fileMessage", ({ name, url }) => {
-        const link = document.createElement("a");
-        link.href = url;
-        link.textContent = name;
-        link.download = name;
-        serverMessages.appendChild(link);
-        client1Messages.appendChild(link.cloneNode(true));
-        client2Messages.appendChild(link.cloneNode(true));
+      socket.on("fileMessage", (fileData) => {
+        const clientMessagesDiv = document.getElementById("clientMessages");
+        const serverMessagesDiv = document.getElementById("serverMessages");
+        const fileLink = document.createElement("a");
+        fileLink.href = fileData.url;
+        fileLink.download = fileData.name;
+        fileLink.textContent = fileData.name;
+        fileLink.className = "p-2 bg-gray-200 rounded-lg block";
+
+        if (clientMessagesDiv) {
+          clientMessagesDiv.appendChild(fileLink.cloneNode(true));
+        }
+        if (serverMessagesDiv) {
+          serverMessagesDiv.appendChild(fileLink);
+        }
       });
 
-      // Chat form for client 1
-      const chatForm1 = document.getElementById("chatForm1");
-      chatForm1.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const input = document.getElementById("messageInput1");
-        const message = input.value;
+      document.getElementById("chatForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const messageInput = document.getElementById("messageInput");
+        const message = messageInput.value;
         socket.emit("chatMessage", message);
-        input.value = "";
+        messageInput.value = "";
       });
 
-      // Chat form for client 2
-      const chatForm2 = document.getElementById("chatForm2");
-      chatForm2.addEventListener("submit", (event) => {
-        event.preventDefault();
-        const input = document.getElementById("messageInput2");
-        const message = input.value;
-        socket.emit("chatMessage", message);
-        input.value = "";
-      });
+      document.getElementById("recordButton").addEventListener("click", async () => {
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioRecorder = new MediaRecorder(audioStream);
+        audioRecorder.start();
 
-      // File handling for client 1
-      const fileInput1 = document.getElementById("fileInput1");
-      const sendFileButton1 = document.getElementById("sendFileButton1");
-      fileInput1.addEventListener("change", () => {
-        sendFileButton1.classList.remove("hidden");
-      });
-      sendFileButton1.addEventListener("click", () => {
-        const file = fileInput1.files[0];
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result.split(",")[1];
-          socket.emit("fileNote", { name: file.name, data: base64 });
-        };
-        reader.readAsDataURL(file);
-      });
-
-      // File handling for client 2
-      const fileInput2 = document.getElementById("fileInput2");
-      const sendFileButton2 = document.getElementById("sendFileButton2");
-      fileInput2.addEventListener("change", () => {
-        sendFileButton2.classList.remove("hidden");
-      });
-      sendFileButton2.addEventListener("click", () => {
-        const file = fileInput2.files[0];
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result.split(",")[1];
-          socket.emit("fileNote", { name: file.name, data: base64 });
-        };
-        reader.readAsDataURL(file);
-      });
-
-      // Voice note handling for client 1
-      const recordButton1 = document.getElementById("recordButton1");
-      let mediaRecorder1;
-      let audioChunks1 = [];
-      recordButton1.addEventListener("click", () => {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-          mediaRecorder1 = new MediaRecorder(stream);
-          mediaRecorder1.start();
-          mediaRecorder1.addEventListener("dataavailable", (event) => {
-            audioChunks1.push(event.data);
-          });
-          mediaRecorder1.addEventListener("stop", () => {
-            const audioBlob = new Blob(audioChunks1, { type: "audio/wav" });
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = reader.result.split(",")[1];
-              socket.emit("voiceNote", base64);
-            };
-            reader.readAsDataURL(audioBlob);
-          });
-          setTimeout(() => {
-            mediaRecorder1.stop();
-          }, 3000); // Record for 3 seconds
+        let audioChunks = [];
+        audioRecorder.addEventListener("dataavailable", (event) => {
+          audioChunks.push(event.data);
         });
-      });
 
-      // Voice note handling for client 2
-      const recordButton2 = document.getElementById("recordButton2");
-      let mediaRecorder2;
-      let audioChunks2 = [];
-      recordButton2.addEventListener("click", () => {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-          mediaRecorder2 = new MediaRecorder(stream);
-          mediaRecorder2.start();
-          mediaRecorder2.addEventListener("dataavailable", (event) => {
-            audioChunks2.push(event.data);
-          });
-          mediaRecorder2.addEventListener("stop", () => {
-            const audioBlob = new Blob(audioChunks2, { type: "audio/wav" });
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = reader.result.split(",")[1];
-              socket.emit("voiceNote", base64);
-            };
-            reader.readAsDataURL(audioBlob);
-          });
-          setTimeout(() => {
-            mediaRecorder2.stop();
-          }, 3000); // Record for 3 seconds
+        audioRecorder.addEventListener("stop", () => {
+          const audioBlob = new Blob(audioChunks);
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = reader.result.split(",")[1];
+            socket.emit("voiceNote", base64);
+          };
+          reader.readAsDataURL(audioBlob);
         });
+
+        setTimeout(() => {
+          audioRecorder.stop();
+        }, 5000); // Record for 5 seconds
       });
 
-      // Video note handling for client 1
-      const recordVideoButton1 = document.getElementById("recordVideoButton1");
-      const videoPreview1 = document.getElementById("videoPreview1");
-      const sendVideoButton1 = document.getElementById("sendVideoButton1");
-      let videoRecorder1;
-      let videoChunks1 = [];
-      recordVideoButton1.addEventListener("click", () => {
-        navigator.mediaDevices
-          .getUserMedia({ video: true, audio: true })
-          .then((stream) => {
-            videoPreview1.srcObject = stream;
-            videoPreview1.classList.remove("hidden");
-            videoRecorder1 = new MediaRecorder(stream);
-            videoRecorder1.start();
-            videoRecorder1.addEventListener("dataavailable", (event) => {
-              videoChunks1.push(event.data);
-            });
-            videoRecorder1.addEventListener("stop", () => {
-              const videoBlob = new Blob(videoChunks1, { type: "video/webm" });
-              const reader = new FileReader();
-              reader.onload = () => {
-                const base64 = reader.result.split(",")[1];
-                socket.emit("videoNote", base64);
-              };
-              reader.readAsDataURL(videoBlob);
-              videoPreview1.classList.add("hidden");
-              videoPreview1.srcObject = null;
-            });
-            setTimeout(() => {
-              videoRecorder1.stop();
-            }, 5000); // Record for 5 seconds
-            sendVideoButton1.classList.remove("hidden");
-          });
-      });
-      sendVideoButton1.addEventListener("click", () => {
-        videoRecorder1.stop();
+      document.getElementById("recordVideoButton").addEventListener("click", async () => {
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const videoPreview = document.getElementById("videoPreview");
+        videoPreview.srcObject = videoStream;
+        videoPreview.classList.remove("hidden");
+
+        videoRecorder = new MediaRecorder(videoStream);
+        videoRecorder.start();
+
+        videoChunks = [];
+        videoRecorder.addEventListener("dataavailable", (event) => {
+          videoChunks.push(event.data);
+        });
+
+        videoRecorder.addEventListener("stop", () => {
+          const videoBlob = new Blob(videoChunks, { type: "video/webm" });
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = reader.result.split(",")[1];
+            socket.emit("videoNote", base64);
+          };
+          reader.readAsDataURL(videoBlob);
+          videoPreview.classList.add("hidden");
+          videoPreview.srcObject = null;
+        });
+
+        setTimeout(() => {
+          videoRecorder.stop();
+        }, 5000); // Record for 5 seconds
+        document.getElementById("sendVideoButton").classList.remove("hidden");
       });
 
-      // Video note handling for client 2
-      const recordVideoButton2 = document.getElementById("recordVideoButton2");
-      const videoPreview2 = document.getElementById("videoPreview2");
-      const sendVideoButton2 = document.getElementById("sendVideoButton2");
-      let videoRecorder2;
-      let videoChunks2 = [];
-      recordVideoButton2.addEventListener("click", () => {
-        navigator.mediaDevices
-          .getUserMedia({ video: true, audio: true })
-          .then((stream) => {
-            videoPreview2.srcObject = stream;
-            videoPreview2.classList.remove("hidden");
-            videoRecorder2 = new MediaRecorder(stream);
-            videoRecorder2.start();
-            videoRecorder2.addEventListener("dataavailable", (event) => {
-              videoChunks2.push(event.data);
-            });
-            videoRecorder2.addEventListener("stop", () => {
-              const videoBlob = new Blob(videoChunks2, { type: "video/webm" });
-              const reader = new FileReader();
-              reader.onload = () => {
-                const base64 = reader.result.split(",")[1];
-                socket.emit("videoNote", base64);
-              };
-              reader.readAsDataURL(videoBlob);
-              videoPreview2.classList.add("hidden");
-              videoPreview2.srcObject = null;
-            });
-            setTimeout(() => {
-              videoRecorder2.stop();
-            }, 5000); // Record for 5 seconds
-            sendVideoButton2.classList.remove("hidden");
-          });
-      });
-      sendVideoButton2.addEventListener("click", () => {
-        videoRecorder2.stop();
+      document.getElementById("fileInput").addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = reader.result.split(",")[1];
+            socket.emit("fileNote", { data: base64, name: file.name });
+          };
+          reader.readAsDataURL(file);
+        }
       });
     </script>
   </body>
